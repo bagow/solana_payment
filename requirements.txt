@@ -1,0 +1,9 @@
+solana
+solders
+anchorpy
+web3
+fastapi
+uvicorn
+python-dotenv
+pydantic
+base58
