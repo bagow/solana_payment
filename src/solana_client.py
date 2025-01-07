@@ -119,3 +119,90 @@ class SolanaClient:
         except Exception as e:
             logger.error(f"Error sending transaction: {str(e)}")
             return {"success": False, "error": str(e)} 
+
+    def send_from_game_wallet(self, game_wallet_index, to_address, amount):
+        """
+        Отправка SOL с игрового кошелька на произвольный адрес
+
+        Args:
+            game_wallet_index (int): Индекс игрового кошелька
+            to_address (str): Адрес получателя
+            amount (float): Количество SOL для отправки
+
+        Returns:
+            dict: Результат транзакции
+        """
+        try:
+            # Получаем приватный ключ игрового кошелька
+            game_wallet = GAME_WALLETS[game_wallet_index]
+            from_keypair = Keypair.from_secret_key(b58decode(game_wallet["private_key"]))
+
+            # Создание транзакции
+            transaction = Transaction().add(
+                transfer(
+                    TransferParams(
+                        from_pubkey=from_keypair.public_key,
+                        to_pubkey=to_address,
+                        lamports=int(amount * 10**9)
+                    )
+                )
+            )
+
+            # Отправка транзакции
+            result = self.client.send_transaction(
+                transaction,
+                from_keypair
+            )
+
+            logger.info(f"Transaction successful: {result['result']}")
+            return {
+                "success": True,
+                "signature": result["result"]
+            }
+
+        except Exception as e:
+            logger.error(f"Error sending transaction: {str(e)}")
+            return {"success": False, "error": str(e)} 
+
+    def send_from_user_wallet(self, from_private_key, to_address, amount):
+        """
+        Отправка SOL с пользовательского кошелька на произвольный адрес
+
+        Args:
+            from_private_key (str): Приватный ключ отправителя
+            to_address (str): Адрес получателя
+            amount (float): Количество SOL для отправки
+
+        Returns:
+            dict: Результат транзакции
+        """
+        try:
+            # Создание keypair из приватного ключа
+            from_keypair = Keypair.from_secret_key(b58decode(from_private_key))
+
+            # Создание транзакции
+            transaction = Transaction().add(
+                transfer(
+                    TransferParams(
+                        from_pubkey=from_keypair.public_key,
+                        to_pubkey=to_address,
+                        lamports=int(amount * 10**9)
+                    )
+                )
+            )
+
+            # Отправка транзакции
+            result = self.client.send_transaction(
+                transaction,
+                from_keypair
+            )
+
+            logger.info(f"Transaction successful: {result['result']}")
+            return {
+                "success": True,
+                "signature": result["result"]
+            }
+
+        except Exception as e:
+            logger.error(f"Error sending transaction: {str(e)}")
+            return {"success": False, "error": str(e)} 

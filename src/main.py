@@ -37,6 +37,16 @@ class GameTransactionRequest(BaseModel):
 class BalanceRequest(BaseModel):
     public_key: str = Field(..., description="Публичный ключ кошелька")
 
+class GameToExternalTransactionRequest(BaseModel):
+    wallet_index: int = Field(..., ge=0, lt=3, description="Индекс игрового кошелька (0-2)")
+    to_address: str = Field(..., description="Адрес получателя")
+    amount: float = Field(..., gt=0, description="Сумма перевода в SOL")
+
+class UserToExternalTransactionRequest(BaseModel):
+    from_private_key: str = Field(..., description="Приватный ключ отправителя")
+    to_address: str = Field(..., description="Адрес получателя")
+    amount: float = Field(..., gt=0, description="Сумма перевода в SOL")
+
 # API эндпоинты
 @app.get("/health")
 async def health_check():
@@ -126,4 +136,47 @@ async def get_commission_info():
     return {
         "commission_percentage": COMMISSION_PERCENTAGE,
         "commission_wallet": COMMISSION_WALLET_ADDRESS
-    } 
+    }
+
+@app.post("/send_from_game_wallet")
+async def send_from_game_wallet(request: GameToExternalTransactionRequest):
+    """
+    Отправка SOL с игрового кошелька на произвольный адрес
+
+    Args:
+        request (GameToExternalTransactionRequest): Данные запроса
+
+    Returns:
+        dict: Результат транзакции
+    """
+    if request.wallet_index not in range(len(GAME_WALLET_ADDRESSES)):
+        raise HTTPException(status_code=400, detail="Invalid wallet index")
+
+    result = solana_client.send_from_game_wallet(
+        request.wallet_index,
+        request.to_address,
+        request.amount
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result 
+
+@app.post("/send_from_user_wallet")
+async def send_from_user_wallet(request: UserToExternalTransactionRequest):
+    """
+    Отправка SOL с пользовательского кошелька на произвольный адрес
+
+    Args:
+        request (UserToExternalTransactionRequest): Данные запроса
+
+    Returns:
+        dict: Результат транзакции
+    """
+    result = solana_client.send_from_user_wallet(
+        request.from_private_key,
+        request.to_address,
+        request.amount
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result 
