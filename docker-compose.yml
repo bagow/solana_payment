@@ -7,12 +7,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app
-    environment:
-      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - WALLET_DATA_DIR=/app
-      - COMMISSION_PERCENTAGE=5
-    user: "1000:1000"
+#      - ./data:/app/data
+      - ./:/app
+    env_file:
+      - src/.env
+#    user: "1000:1000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -20,8 +19,8 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - app-network
+      - solana-bot_app_network
 
 networks:
-  app-network:
-    driver: bridge
+  solana-bot_app_network:
+    external: true

@@ -1,4 +1,5 @@
-from solana.keypair import Keypair
+# from solana.keypair import Keypair
+from solders.keypair import Keypair
 from base58 import b58encode
 from dotenv import load_dotenv
 import os
@@ -47,7 +48,7 @@ def generate_wallets():
         for i in range(3):
             keypair = Keypair()
             wallet = {
-                "public_key": str(keypair.public_key),
+                "public_key": str(keypair.pubkey()),
                 "private_key": b58encode(keypair.secret_key).decode('ascii')
             }
             wallets["game_wallets"].append(wallet)
@@ -56,7 +57,7 @@ def generate_wallets():
         # Генерируем комиссионный кошелек
         commission_keypair = Keypair()
         wallets["commission_wallet"] = {
-            "public_key": str(commission_keypair.public_key),
+            "public_key": str(commission_keypair.pubkey()),
             "private_key": b58encode(commission_keypair.secret_key).decode('ascii')
         }
         logger.info(f"Generated commission wallet: {wallets['commission_wallet']['public_key']}")

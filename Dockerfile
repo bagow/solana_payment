@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Создание директории для данных
 RUN mkdir -p /app/data
+RUN chmod -R 755 /app/data
 
 # Настройка переменных окружения
 ENV WALLET_DATA_DIR=/app/data

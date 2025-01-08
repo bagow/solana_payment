@@ -1,6 +1,6 @@
-solana
+solana==0.35.1
 solders
-anchorpy
+#anchorpy
 web3
 fastapi
 uvicorn
