@@ -1,14 +1,16 @@
+import logging
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from .solana_client import SolanaClient
+
 from .config import (
-    SOLANA_RPC_URL, 
-    GAME_WALLETS, 
-    GAME_WALLET_ADDRESSES, 
-    COMMISSION_WALLET_ADDRESS, 
+    SOLANA_RPC_URL,
+    GAME_WALLETS,
+    GAME_WALLET_ADDRESSES,
+    COMMISSION_WALLET_ADDRESS,
     COMMISSION_PERCENTAGE
 )
-import logging
+from .solana_client import SolanaClient
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -23,35 +25,42 @@ app = FastAPI(
 # Инициализация клиента Solana
 solana_client = SolanaClient(SOLANA_RPC_URL)
 
+
 # Модели данных для API
 class TransactionRequest(BaseModel):
     from_private_key: str = Field(..., description="Приватный ключ отправителя")
     to_address: str = Field(..., description="Адрес получателя")
     amount: float = Field(..., gt=0, description="Сумма перевода в SOL")
 
+
 class GameTransactionRequest(BaseModel):
     from_private_key: str = Field(..., description="Приватный ключ отправителя")
     wallet_index: int = Field(..., ge=0, lt=3, description="Индекс игрового кошелька (0-2)")
     amount: float = Field(..., gt=0, description="Сумма перевода в SOL")
 
+
 class BalanceRequest(BaseModel):
     public_key: str = Field(..., description="Публичный ключ кошелька")
+
 
 class GameToExternalTransactionRequest(BaseModel):
     wallet_index: int = Field(..., ge=0, lt=3, description="Индекс игрового кошелька (0-2)")
     to_address: str = Field(..., description="Адрес получателя")
     amount: float = Field(..., gt=0, description="Сумма перевода в SOL")
 
+
 class UserToExternalTransactionRequest(BaseModel):
     from_private_key: str = Field(..., description="Приватный ключ отправителя")
     to_address: str = Field(..., description="Адрес получателя")
     amount: float = Field(..., gt=0, description="Сумма перевода в SOL")
+
 
 # API эндпоинты
 @app.get("/health")
 async def health_check():
     """Проверка работоспособности сервиса"""
     return {"status": "healthy"}
+
 
 @app.post("/create_wallet")
 async def create_wallet():
@@ -69,6 +78,7 @@ async def create_wallet():
         logger.error(f"Error creating wallet: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/get_balance")
 async def get_balance(request: BalanceRequest):
     """
@@ -85,6 +95,7 @@ async def get_balance(request: BalanceRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
+
 @app.post("/send_to_game_wallet")
 async def send_to_game_wallet(request: GameTransactionRequest):
     """
@@ -98,7 +109,7 @@ async def send_to_game_wallet(request: GameTransactionRequest):
     """
     if request.wallet_index not in range(len(GAME_WALLET_ADDRESSES)):
         raise HTTPException(status_code=400, detail="Invalid wallet index")
-    
+
     result = solana_client.send_transaction_with_commission(
         request.from_private_key,
         GAME_WALLET_ADDRESSES[request.wallet_index],
@@ -107,6 +118,7 @@ async def send_to_game_wallet(request: GameTransactionRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
 
 @app.get("/game_wallets")
 async def get_game_wallets():
@@ -125,6 +137,7 @@ async def get_game_wallets():
         ]
     }
 
+
 @app.get("/commission_info")
 async def get_commission_info():
     """
@@ -137,6 +150,7 @@ async def get_commission_info():
         "commission_percentage": COMMISSION_PERCENTAGE,
         "commission_wallet": COMMISSION_WALLET_ADDRESS
     }
+
 
 @app.post("/send_from_game_wallet")
 async def send_from_game_wallet(request: GameToExternalTransactionRequest):
@@ -159,7 +173,8 @@ async def send_from_game_wallet(request: GameToExternalTransactionRequest):
     )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
-    return result 
+    return result
+
 
 @app.post("/send_from_user_wallet")
 async def send_from_user_wallet(request: UserToExternalTransactionRequest):
@@ -179,4 +194,4 @@ async def send_from_user_wallet(request: UserToExternalTransactionRequest):
     )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
-    return result 
+    return result

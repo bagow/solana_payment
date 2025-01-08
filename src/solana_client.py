@@ -1,6 +1,5 @@
 from solana.rpc.api import Client
-from base58 import b58encode, b58decode
-from .config import COMMISSION_WALLET_ADDRESS, COMMISSION_PERCENTAGE
+from .config import COMMISSION_WALLET_ADDRESS, COMMISSION_PERCENTAGE, GAME_WALLETS
 import logging
 
 from solders.keypair import Keypair
@@ -14,6 +13,7 @@ from solders.transaction import Transaction
 logger = logging.getLogger(__name__)
 
 
+# TODO: remake to AsyncClient
 class SolanaClient:
     def __init__(self, rpc_url):
         """
@@ -35,8 +35,9 @@ class SolanaClient:
         try:
             keypair = Keypair()
             public_key = str(keypair.pubkey())
+            # TODO: discuss w/ D. Bagow
             # private_key = b58encode(keypair.secret_key).decode('ascii')
-            private_key = str(keypair.secret())
+            private_key = keypair.secret().hex()
 
             logger.info(f"Created new wallet: {public_key}")
             return {
@@ -47,7 +48,7 @@ class SolanaClient:
             logger.error(f"Error creating wallet: {str(e)}")
             raise
 
-    def get_balance(self, public_key):
+    def get_balance(self, public_key: str) -> dict:
         """
         Получение баланса кошелька
         
@@ -58,7 +59,6 @@ class SolanaClient:
             dict: Результат операции с балансом или ошибкой
         """
         try:
-            print('public_key', public_key)
             response = self.client.get_balance(Pubkey.from_string(public_key))
             balance = response.value / 10 ** 9  # Конвертация из lamports в SOL
             logger.info(f"Balance for {public_key}: {balance} SOL")
@@ -72,7 +72,7 @@ class SolanaClient:
         Отправка SOL с учетом комиссии
         
         Args:
-            from_private_key (str): Приватный ключ отправителя
+            from_private_key (str): Приватный ключ отправителя (secret in hex, not public key)
             to_address (str): Адрес получателя
             amount (float): Количество SOL для отправки
             
@@ -80,47 +80,57 @@ class SolanaClient:
             dict: Результат транзакции
         """
         try:
-            # Создание keypair из приватного ключа
-            from_keypair = Keypair.from_secret_key(b58decode(from_private_key))
-
-            # Расчет комиссии
             commission_amount = amount * (COMMISSION_PERCENTAGE / 100)
             main_amount = amount - commission_amount
-
             logger.info(f"Preparing transaction: {main_amount} SOL + {commission_amount} SOL commission")
 
-            # Создание транзакции для основной суммы
-            transaction = Transaction().add(
-                transfer(
-                    TransferParams(
-                        from_pubkey=from_keypair.pubkey(),
-                        to_pubkey=to_address,
-                        lamports=int(main_amount * 10 ** 9)
-                    )
-                )
-            )
+            # TODO: disscuss w/ D. Bagow
+            # # Создание keypair из приватного ключа
+            # from_keypair = Keypair.from_secret_key(b58decode(from_private_key))
+            # # Создание транзакции для основной суммы
+            # transaction = Transaction().add(
+            #     transfer(
+            #         TransferParams(
+            #             from_pubkey=from_keypair.pubkey(),
+            #             to_pubkey=to_address,
+            #             lamports=int(main_amount * 10 ** 9)
+            #         )
+            #     )
+            # )
+            #
+            # # Добавление транзакции для комиссии
+            # transaction.add(
+            #     transfer(
+            #         TransferParams(
+            #             from_pubkey=from_keypair.pubkey(),
+            #             to_pubkey=COMMISSION_WALLET_ADDRESS,
+            #             lamports=int(commission_amount * 10 ** 9)
+            #         )
+            #     )
+            # )
+            # # Отправка транзакции
+            # result = self.client.send_transaction(
+            #     transaction,
+            #     from_keypair
+            # )
 
-            # Добавление транзакции для комиссии
-            transaction.add(
-                transfer(
-                    TransferParams(
-                        from_pubkey=from_keypair.pubkey(),
-                        to_pubkey=COMMISSION_WALLET_ADDRESS,
-                        lamports=int(commission_amount * 10 ** 9)
-                    )
-                )
+            transaction_hash_main = self._send_transaction(
+                from_private_key,
+                to_address,
+                main_amount
             )
-
-            # Отправка транзакции
-            result = self.client.send_transaction(
-                transaction,
-                from_keypair
+            logger.info(f"Transaction MAIN successful: {transaction_hash_main}")
+            transaction_commission_hash = self._send_transaction(
+                from_private_key,
+                to_address,
+                commission_amount
             )
+            logger.info(f"Transaction COMMISSION successful: {transaction_commission_hash}")
 
-            logger.info(f"Transaction successful: {result['result']}")
             return {
                 "success": True,
-                "signature": result["result"],
+                "signature": transaction_hash_main,
+                "signature_commission": transaction_commission_hash,
                 "main_amount": main_amount,
                 "commission_amount": commission_amount
             }
@@ -142,31 +152,38 @@ class SolanaClient:
             dict: Результат транзакции
         """
         try:
+            # TODO: discuss w/ D.Bagow
             # Получаем приватный ключ игрового кошелька
+            # game_wallet = GAME_WALLETS[game_wallet_index]
+            # from_keypair = Keypair.from_secret_key(b58decode(game_wallet["private_key"]))
+            #
+            # # Создание транзакции
+            # transaction = Transaction().add(
+            #     transfer(
+            #         TransferParams(
+            #             from_pubkey=from_keypair.pubkey(),
+            #             to_pubkey=to_address,
+            #             lamports=int(amount * 10 ** 9)
+            #         )
+            #     )
+            # )
+            #
+            # # Отправка транзакции
+            # result = self.client.send_transaction(
+            #     transaction,
+            #     from_keypair
+            # )
+
             game_wallet = GAME_WALLETS[game_wallet_index]
-            from_keypair = Keypair.from_secret_key(b58decode(game_wallet["private_key"]))
-
-            # Создание транзакции
-            transaction = Transaction().add(
-                transfer(
-                    TransferParams(
-                        from_pubkey=from_keypair.pubkey(),
-                        to_pubkey=to_address,
-                        lamports=int(amount * 10 ** 9)
-                    )
-                )
+            transaction_hash = self._send_transaction(
+                game_wallet["private_key"],
+                to_address,
+                amount
             )
-
-            # Отправка транзакции
-            result = self.client.send_transaction(
-                transaction,
-                from_keypair
-            )
-
-            logger.info(f"Transaction successful: {result['result']}")
+            logger.info(f"Transaction successful: {transaction_hash}")
             return {
                 "success": True,
-                "signature": result["result"]
+                "signature": transaction_hash
             }
 
         except Exception as e:
@@ -178,7 +195,7 @@ class SolanaClient:
         Отправка SOL с пользовательского кошелька на произвольный адрес
 
         Args:
-            from_private_key (str): Приватный ключ отправителя
+            from_private_key (str): Приватный ключ отправителя (secret in hex, not public key)
             to_address (str): Адрес получателя
             amount (float): Количество SOL для отправки
 
@@ -186,30 +203,42 @@ class SolanaClient:
             dict: Результат транзакции
         """
         try:
-            from_keypair = Keypair.from_seed(bytes.fromhex(from_private_key))
-            to_address_pub_key = Pubkey.from_string(to_address)
-            ixns = [
-                transfer(
-                    TransferParams(
-                        from_pubkey=from_keypair.pubkey(), to_pubkey=to_address_pub_key, lamports=int(amount * 10 ** 9)
-                    )
-                )
-            ]
-            msg = Message(ixns, from_keypair.pubkey())
-            transaction = Transaction(
-                [from_keypair],
-                msg,
-                self.client.get_latest_blockhash().value.blockhash,
+            transaction_hash = self._send_transaction(
+                from_private_key,
+                to_address,
+                amount
             )
-            # Отправка транзакции
-            result = self.client.send_transaction(transaction)
-            trans_hash = str(result.value)
-            logger.info(f"Transaction successful: {trans_hash}")
+            logger.info(f"Transaction successful: {transaction_hash}")
             return {
                 "success": True,
-                "signature": trans_hash
+                "signature": transaction_hash
             }
         except Exception as e:
             logger.error(f"Error sending transaction: {str(e)}")
             return {"success": False, "error": str(e)}
 
+    def _send_transaction(
+            self,
+            sender_secret_key: str,
+            receiver_address: str,
+            amount: float,
+    ) -> str:
+        """Sends a transaction. Returns signature"""
+        from_keypair = Keypair.from_seed(bytes.fromhex(sender_secret_key))
+        to_address_pub_key = Pubkey.from_string(receiver_address)
+        ixns = [
+            transfer(
+                TransferParams(
+                    from_pubkey=from_keypair.pubkey(), to_pubkey=to_address_pub_key, lamports=int(amount * 10 ** 9)
+                )
+            )
+        ]
+        msg = Message(ixns, from_keypair.pubkey())
+        transaction = Transaction(
+            [from_keypair],
+            msg,
+            self.client.get_latest_blockhash().value.blockhash,
+        )
+        # Отправка транзакции
+        result = self.client.send_transaction(transaction)
+        return str(result.value)

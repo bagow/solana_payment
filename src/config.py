@@ -49,7 +49,9 @@ def generate_wallets():
             keypair = Keypair()
             wallet = {
                 "public_key": str(keypair.pubkey()),
-                "private_key": b58encode(keypair.secret_key).decode('ascii')
+                # TODO: discuss w/ D. Bagow
+                # "private_key": b58encode(keypair.secret_key).decode('ascii')
+                "private_key": keypair.secret().hex()
             }
             wallets["game_wallets"].append(wallet)
             logger.info(f"Generated game wallet {i+1}: {wallet['public_key']}")
