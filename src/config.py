@@ -60,7 +60,8 @@ def generate_wallets():
         commission_keypair = Keypair()
         wallets["commission_wallet"] = {
             "public_key": str(commission_keypair.pubkey()),
-            "private_key": b58encode(commission_keypair.secret_key).decode('ascii')
+            # "private_key": b58encode(commission_keypair.secret_key).decode('ascii')
+            "private_key": commission_keypair.secret().hex()
         }
         logger.info(f"Generated commission wallet: {wallets['commission_wallet']['public_key']}")
         

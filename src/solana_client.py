@@ -1,5 +1,5 @@
 from solana.rpc.api import Client
-from .config import COMMISSION_WALLET_ADDRESS, COMMISSION_PERCENTAGE, GAME_WALLETS
+from .config import COMMISSION_WALLET_ADDRESS, COMMISSION_PERCENTAGE, GAME_WALLETS, COMMISSION_WALLET
 import logging
 
 from solders.keypair import Keypair
@@ -60,7 +60,7 @@ class SolanaClient:
         """
         try:
             response = self.client.get_balance(Pubkey.from_string(public_key))
-            balance = response.value / 10 ** 9  # Конвертация из lamports в SOL
+            balance = self.lamports_to_sol(response.value)  # Конвертация из lamports в SOL
             logger.info(f"Balance for {public_key}: {balance} SOL")
             return {"success": True, "balance": balance}
         except Exception as e:
@@ -84,48 +84,30 @@ class SolanaClient:
             main_amount = amount - commission_amount
             logger.info(f"Preparing transaction: {main_amount} SOL + {commission_amount} SOL commission")
 
-            # TODO: disscuss w/ D. Bagow
-            # # Создание keypair из приватного ключа
-            # from_keypair = Keypair.from_secret_key(b58decode(from_private_key))
-            # # Создание транзакции для основной суммы
-            # transaction = Transaction().add(
-            #     transfer(
-            #         TransferParams(
-            #             from_pubkey=from_keypair.pubkey(),
-            #             to_pubkey=to_address,
-            #             lamports=int(main_amount * 10 ** 9)
-            #         )
-            #     )
-            # )
-            #
-            # # Добавление транзакции для комиссии
-            # transaction.add(
-            #     transfer(
-            #         TransferParams(
-            #             from_pubkey=from_keypair.pubkey(),
-            #             to_pubkey=COMMISSION_WALLET_ADDRESS,
-            #             lamports=int(commission_amount * 10 ** 9)
-            #         )
-            #     )
-            # )
-            # # Отправка транзакции
-            # result = self.client.send_transaction(
-            #     transaction,
-            #     from_keypair
-            # )
-
-            transaction_hash_main = self._send_transaction(
-                from_private_key,
-                to_address,
-                main_amount
-            )
-            logger.info(f"Transaction MAIN successful: {transaction_hash_main}")
-            transaction_commission_hash = self._send_transaction(
-                from_private_key,
-                to_address,
-                commission_amount
-            )
-            logger.info(f"Transaction COMMISSION successful: {transaction_commission_hash}")
+            # We must check the balance of commission wallet for existing of "Rent-exempt minimum" before replenishing it
+            # Rent-exempt minimum is 0.00089088 SOL. If it's lower, we transfer sol from game wallet to commission wallet (in our case only to comission wallet, not to main wallet to save resources)
+            # this process should happen once per all time
+            transaction_hash_main = None
+            if self.get_balance(COMMISSION_WALLET_ADDRESS)['balance'] < self.lamports_to_sol(self.client.get_minimum_balance_for_rent_exemption(0).value):
+                transaction_commission_hash = self._send_transaction(
+                    from_private_key,
+                    COMMISSION_WALLET_ADDRESS,
+                    main_amount
+                )
+                logger.info(f"Commission wallet balance is empty. Transfer game's funds to commission wallet. Transaction COMMISSION successful: {transaction_commission_hash}")
+            else:
+                transaction_hash_main = self._send_transaction(
+                    from_private_key,
+                    to_address,
+                    main_amount
+                )
+                logger.info(f"Transaction MAIN successful: {transaction_hash_main}")
+                transaction_commission_hash = self._send_transaction(
+                    from_private_key,
+                    COMMISSION_WALLET_ADDRESS,
+                    commission_amount
+                )
+                logger.info(f"Transaction COMMISSION successful: {transaction_commission_hash}")
 
             return {
                 "success": True,
@@ -152,28 +134,6 @@ class SolanaClient:
             dict: Результат транзакции
         """
         try:
-            # TODO: discuss w/ D.Bagow
-            # Получаем приватный ключ игрового кошелька
-            # game_wallet = GAME_WALLETS[game_wallet_index]
-            # from_keypair = Keypair.from_secret_key(b58decode(game_wallet["private_key"]))
-            #
-            # # Создание транзакции
-            # transaction = Transaction().add(
-            #     transfer(
-            #         TransferParams(
-            #             from_pubkey=from_keypair.pubkey(),
-            #             to_pubkey=to_address,
-            #             lamports=int(amount * 10 ** 9)
-            #         )
-            #     )
-            # )
-            #
-            # # Отправка транзакции
-            # result = self.client.send_transaction(
-            #     transaction,
-            #     from_keypair
-            # )
-
             game_wallet = GAME_WALLETS[game_wallet_index]
             transaction_hash = self._send_transaction(
                 game_wallet["private_key"],
@@ -216,6 +176,9 @@ class SolanaClient:
         except Exception as e:
             logger.error(f"Error sending transaction: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    def lamports_to_sol(self, lamports: int) -> float:
+        return lamports / 10 ** 9
 
     def _send_transaction(
             self,

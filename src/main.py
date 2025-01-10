@@ -116,7 +116,7 @@ async def send_to_game_wallet(request: GameTransactionRequest):
         request.amount
     )
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["error"])
+        raise HTTPException(status_code=500, detail=result["error"])
     return result
 
 
