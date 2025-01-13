@@ -3,18 +3,24 @@ version: '3.8'
 services:
   solana_payment:
     build: .
+    container_name: solana_payment
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/home/appuser/app/data
-    environment:
-      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - WALLET_DATA_DIR=/home/appuser/app/data
-      - COMMISSION_PERCENTAGE=5
-    user: "1000:1000"
+#      - ./data:/app/data
+      - ./:/app
+    env_file:
+      - src/.env
+#    user: "1000:1000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3 
+      retries: 3
+    networks:
+      - solana-bot_app_network
+
+networks:
+  solana-bot_app_network:
+    external: true
