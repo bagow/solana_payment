@@ -19,8 +19,8 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - solana-bot_app_network
+      - solana-bot_solana_network
 
 networks:
-  solana-bot_app_network:
+  solana-bot_solana_network:
     external: true

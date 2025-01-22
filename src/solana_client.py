@@ -189,19 +189,33 @@ class SolanaClient:
         """Sends a transaction. Returns signature"""
         from_keypair = Keypair.from_seed(bytes.fromhex(sender_secret_key))
         to_address_pub_key = Pubkey.from_string(receiver_address)
+
+        # Проверяем баланс
+        balance = self.client.get_balance(from_keypair.pubkey()).value
+        if balance < amount * 10 ** 9:
+            raise ValueError("Insufficient funds")
+
+        # Формируем транзакцию
         ixns = [
             transfer(
                 TransferParams(
-                    from_pubkey=from_keypair.pubkey(), to_pubkey=to_address_pub_key, lamports=int(amount * 10 ** 9)
+                    from_pubkey=from_keypair.pubkey(),
+                    to_pubkey=to_address_pub_key,
+                    lamports=int(amount * 10 ** 9)
                 )
             )
         ]
         msg = Message(ixns, from_keypair.pubkey())
-        transaction = Transaction(
-            [from_keypair],
-            msg,
-            self.client.get_latest_blockhash().value.blockhash,
-        )
-        # Отправка транзакции
+
+        # Получаем актуальный blockhash
+        latest_blockhash = self.client.get_latest_blockhash().value.blockhash
+        transaction = Transaction([from_keypair], msg, latest_blockhash)
+
+        # Симулируем транзакцию
+        simulation_result = self.client.simulate_transaction(transaction)
+        if simulation_result.value.err is not None:
+            raise ValueError(f"Transaction simulation failed: {simulation_result.value.err}")
+
+        # Отправляем транзакцию
         result = self.client.send_transaction(transaction)
         return str(result.value)
