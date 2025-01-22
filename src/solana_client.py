@@ -187,7 +187,10 @@ class SolanaClient:
             amount: float,
     ) -> str:
         """Sends a transaction. Returns signature"""
-        from_keypair = Keypair.from_seed(bytes.fromhex(sender_secret_key))
+        try:
+            from_keypair = Keypair.from_seed(bytes.fromhex(sender_secret_key))
+        except:
+            from_keypair = Keypair.from_base58_string(sender_secret_key)
         to_address_pub_key = Pubkey.from_string(receiver_address)
 
         # Проверяем баланс
