@@ -208,10 +208,10 @@ class SolanaClient:
                 )
             )
         ]
-        msg = Message(ixns, from_keypair.pubkey())
 
         # Получаем актуальный blockhash
         latest_blockhash = self.client.get_latest_blockhash().value.blockhash
+        msg = Message.new_with_blockhash(ixns, from_keypair.pubkey(), latest_blockhash)
         transaction = Transaction([from_keypair], msg, latest_blockhash)
 
         # Симулируем транзакцию
